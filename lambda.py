@@ -1,21 +1,18 @@
 import boto3
 import json
 
-# Initialize AWS clients
 s3 = boto3.client('s3')
 textract = boto3.client('textract')
 
 def lambda_handler(event, context):
-    # 1. Extract bucket name and object key from the S3 event
+    
     source_bucket = event['Records'][0]['s3']['bucket']['name']
     document_key = event['Records'][0]['s3']['object']['key']
 
-    # Define target bucket for extracted data
     target_bucket = 'ise391lastbucket'
     target_key = f'extracted/{document_key}.json'
 
     try:
-        # 2. Call Textract to analyze the document
         response = textract.analyze_document(
             Document={
                 'S3Object': {
@@ -23,13 +20,11 @@ def lambda_handler(event, context):
                     'Name': document_key
                 }
             },
-            FeatureTypes=['TABLES', 'FORMS']  # Extract tables and form data
+            FeatureTypes=['TABLES', 'FORMS'] 
         )
         
-        # 3. Process the Textract response if needed
-        extracted_data = json.dumps(response, indent=2)  # Convert response to JSON
+        extracted_data = json.dumps(response, indent=2) 
         
-        # 4. Upload the extracted data to the target S3 bucket
         s3.put_object(
             Bucket=target_bucket,
             Key=target_key,
