@@ -33,18 +33,14 @@ def lambda_handler(event, context):
             FeatureTypes=['TABLES', 'FORMS']
         )
 
-        # Extracting the text content from the response
         extracted_text = extract_text_from_textract(response)
 
-        # Format the extracted data into the required structure
         formatted_data = {
             "extracted_text": extracted_text
         }
 
-        # Convert the formatted data into JSON
         extracted_data = json.dumps(formatted_data, indent=2)
 
-        # Save the extracted data to the target S3 bucket
         s3.put_object(
             Bucket=target_bucket,
             Key=target_key,
@@ -78,9 +74,6 @@ def lambda_handler(event, context):
         }
 
 def extract_text_from_textract(response):
-    """
-    Extracts and combines the text blocks from the Textract response into a single string.
-    """
     blocks = response.get('Blocks', [])
     text = []
 
@@ -88,5 +81,4 @@ def extract_text_from_textract(response):
         if block['BlockType'] == 'LINE':
             text.append(block['Text'])
 
-    # Join all the lines into a single string
     return ' '.join(text)
