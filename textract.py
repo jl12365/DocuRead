@@ -2,19 +2,16 @@ import boto3
 import json
 import urllib.parse
 
-# Initialize AWS clients
 s3 = boto3.client('s3', region_name='us-east-2')
 textract = boto3.client('textract', region_name='us-east-2')
 
 
 def lambda_handler(event, context):
     try:
-        # 1. Extract bucket and file details from the event
         source_bucket = event['Records'][0]['s3']['bucket']['name']
         document_key = urllib.parse.unquote_plus(event['Records'][0]['s3']['object']['key'])
         print(f"Processing file from bucket: {source_bucket}, key: {document_key}")
 
-        # Validate that the file is a supported format (PDF, JPG, PNG)
         if not (document_key.lower().endswith('.pdf') or document_key.lower().endswith(('.jpg', '.jpeg', '.png'))):
             print(f"Unsupported file format: {document_key}")
             return {
@@ -22,15 +19,10 @@ def lambda_handler(event, context):
                 'body': json.dumps(f"Unsupported file format. Only PDFs, JPGs, and PNGs are supported: {document_key}")
             }
 
-        # 2. Define the target bucket and key for extracted data
-        target_bucket = 'ise391lastbucket'
+        target_bucket = 'ise391textdata'
         target_key = f'extracted/{document_key.replace(" ", "_")}.json'
-
-        # 3. Check if the file is valid by fetching metadata
         obj_metadata = s3.head_object(Bucket=source_bucket, Key=document_key)
-        print(f"Retrieved metadata for {document_key}: {obj_metadata}")
 
-        # 4. Call Textract to analyze the document or image
         response = textract.analyze_document(
             Document={
                 'S3Object': {
@@ -38,13 +30,21 @@ def lambda_handler(event, context):
                     'Name': document_key
                 }
             },
-            FeatureTypes=['TABLES', 'FORMS']  # Extract tables and form data
+            FeatureTypes=['TABLES', 'FORMS']
         )
 
-        # 5. Process the Textract response
-        extracted_data = json.dumps(response, indent=2)  # Convert response to JSON
+        # Extracting the text content from the response
+        extracted_text = extract_text_from_textract(response)
 
-        # 6. Upload the extracted data to the target S3 bucket
+        # Format the extracted data into the required structure
+        formatted_data = {
+            "extracted_text": extracted_text
+        }
+
+        # Convert the formatted data into JSON
+        extracted_data = json.dumps(formatted_data, indent=2)
+
+        # Save the extracted data to the target S3 bucket
         s3.put_object(
             Bucket=target_bucket,
             Key=target_key,
@@ -76,3 +76,17 @@ def lambda_handler(event, context):
             'statusCode': 500,
             'body': json.dumps(f"Error: {str(e)}")
         }
+
+def extract_text_from_textract(response):
+    """
+    Extracts and combines the text blocks from the Textract response into a single string.
+    """
+    blocks = response.get('Blocks', [])
+    text = []
+
+    for block in blocks:
+        if block['BlockType'] == 'LINE':
+            text.append(block['Text'])
+
+    # Join all the lines into a single string
+    return ' '.join(text)
